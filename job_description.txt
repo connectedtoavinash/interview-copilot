@@ -1,0 +1,7 @@
+Target Role: Senior Software Development Engineer (SDE II / Senior SDE)
+Key Focus Areas:
+- High-concurrency backend services and distributed systems.
+- Robust multithreaded design, low-latency API development, and data consistency.
+- System design, scalability, trade-off analysis, and production troubleshooting.
+- Hands-on coding with clean architecture, design patterns, and unit/integration testing.
+

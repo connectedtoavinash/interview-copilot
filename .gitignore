@@ -1,0 +1,19 @@
+# Environments and secrets
+.env
+venv/
+__pycache__/
+*.pyc
+
+# Audio temp recordings
+*.wav
+*.raw
+temp_*.wav
+
+# System / IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Temporary outputs
+questuii.txt
+

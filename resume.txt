@@ -1,0 +1,60 @@
+# ==============================================================================
+# CANDIDATE PROFILE: Avinash Singh
+# Role: Senior Java Full Stack Developer & Distributed Systems Engineer
+# Location: Noida, India | Contact: tavinash0077@gmail.com | +91-8708347535
+# Links: linkedin.com/in/avinash-singh | github.com/tavinash0077
+# ==============================================================================
+
+## SUMMARY & VALUE PROPOSITION
+Senior Java Full Stack Developer with ~4 years of experience building high-concurrency distributed systems, real-time multimedia platforms, and event-driven microservices at tier-1 enterprise scale (Samsung R&D, Mastercard). Expert in Java, Spring Boot, Multithreading & Concurrency, AWS Cloud, WebRTC/LiveKit, and Database Optimization (PostgreSQL, Oracle, Redis, DynamoDB). Proven track record of architecting scalable notification/media servers and async ingestion pipelines serving millions of users.
+
+---
+
+## CORE TECHNICAL SKILLS
+- **Core Languages:** Java (8/11/17/21), TypeScript, JavaScript, SQL, Bash.
+- **Backend Architecture:** Spring Boot, Spring MVC, Spring Security, Microservices, RESTful APIs, Spring Data JPA, Hibernate, MyBatis, JWT, OAuth2, GraphQL, gRPC, Distributed Systems, Low-Level Design (LLD), High-Level Design (HLD).
+- **Concurrency & Multithreading:** Thread Pools (ExecutorService), Async Processing, Locks & Semaphores (ReentrantLock), CompletableFuture, Java Memory Model (JMM), Race Conditions, Deadlock Mitigation, LiveKit WebRTC audio/video concurrency.
+- **Messaging & Event-Driven:** AWS SQS, AWS SNS, Event-Driven Architecture, Asynchronous batch processing.
+- **Databases & Caching:** PostgreSQL, Oracle DB, MySQL, DynamoDB, Redis (Cache-aside, Distributed Locking), MongoDB.
+- **Cloud & DevOps:** AWS (API Gateway, SQS, SNS, DynamoDB, Lambda, EC2, CloudWatch, CloudTrail, RDS), Docker, Kubernetes, CI/CD (Jenkins, GitHub Actions), Linux systems.
+- **Observability & APM:** Prometheus, Grafana, Loki, Tempo (Metrics, Logs, Traces).
+- **Frontend:** Angular, React.js, Material-UI, React Router, HTML5, CSS3.
+- **Testing & Tools:** JUnit 5, Mockito, Postman, Maven, Gradle, Git, Jira, Confluence.
+
+---
+
+## PROFESSIONAL EXPERIENCE & KEY PROJECTS
+
+### 1. Samsung R&D Institute – Noida (via Tech Mahindra)
+**Role:** Java FullStack Developer | **Duration:** December 2025 – Present
+**Project:** Samsung Classroom Application (Korea Market - Large Scale Virtual Classroom Platform)
+* **System Architecture:** Designed and built the `Classroom-server` and `Push-Notification-server` architecture for large-scale virtual classroom sessions targeting millions of concurrent users.
+* **Real-time Media & WebRTC:** Integrated **LiveKit media server** to deliver sub-second, low-latency real-time audio, video, and screen-sharing communication.
+* **Concurrency & Device Control:** Engineered device control event flows managing real-time in-session participant interactions (remote mute/unmute, role permissions, screen-share delegation) under heavy concurrency.
+* **High Concurrency & Load Testing:** Conducted rigorous load testing and performance profiling to ensure zero-lag session stability under peak traffic spikes.
+* **Full-Stack Observability:** Configured an end-to-end telemetry pipeline for logs, metrics, and traces using **Loki, Prometheus, and Tempo** in Grafana.
+* **Security & Auth:** Implemented end-to-end authentication and role-based access control integrating Samsung Account authentication.
+
+### 2. Samsung R&D Institute – Delhi
+**Role:** Java FullStack Developer | **Duration:** February 2025 – December 2025
+**Project:** Samsung TV Plus - High-Throughput Content Ingestion Pipeline
+* **High-Throughput Content Ingestion:** Architected a resilient ingestion engine to receive, authenticate, validate, and transform large-scale metadata and video feeds from multiple global content providers (Gracenote, UMD).
+* **Spring Boot REST & AWS API Gateway:** Developed high-throughput RESTful microservices integrated with AWS API Gateway for secure rate-limiting and external provider ingestion.
+* **Async Multithreaded Processing:** Integrated **AWS SQS with custom Java multithreaded worker pools (ThreadPoolExecutor)** to process heavy media payloads asynchronously, preventing ingestion bottlenecks.
+* **Database & Persistence:** Designed dual-persistence architecture using **DynamoDB** for real-time ingestion status tracking and **Oracle / PostgreSQL with MyBatis** for structured content metadata.
+* **Performance & Caching:** Implemented **Redis caching** and CloudTrail audit logging, drastically reducing redundant database reads and ensuring strict compliance.
+* **CMS Monitoring Dashboard:** Built a full-stack **Angular** administration dashboard with AWS SNS alerting to track 4xx/5xx errors, retry dead-letter queues (DLQ), and reprocess failed records with zero downtime.
+
+### 3. Wipro Limited (Client: Mastercard OFFERS – Pune)
+**Role:** Java Full Stack Developer | **Duration:** May 2022 – December 2024
+**Project:** Mastercard Offers Platform
+* **Production REST Services:** Built and maintained business-critical Java backend services and REST APIs serving high-volume Mastercard production transactions.
+* **Performance Tuning:** Profiled and optimized database queries, connection pooling (HikariCP), and API workflows, reducing average response latency and improving system throughput.
+* **Root Cause Analysis (RCA) & Production Stability:** Investigated and resolved complex production incidents using thread dumps, heap dumps, and distributed logs, achieving 99.9%+ platform uptime SLA.
+* **Agile & Zero-Downtime Deployments:** Collaborated in 2-week Agile sprints with cross-functional global teams, executing smooth blue-green zero-downtime releases.
+
+---
+
+## EDUCATION
+**Chandigarh Group of Colleges**
+Bachelor of Technology (B.Tech) in Information Technology | 2018 – 2022
