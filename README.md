@@ -12,6 +12,13 @@ An undetectable, real-time technical interview assistant that captures interview
   - **Audio Loopback**: Automatically captures interviewer's voice via Linux PipeWire (`pw-record`) and transcribes using Groq Whisper.
   - **Clipboard Shortcut (`Ctrl+Alt+C`)**: Instantly send copied questions or code snippets directly to the server.
   - **Phone Paste Modal**: Manually paste text or code directly from your phone.
+- **Dual Answering Modes (Dynamic Toggle)**:
+  - **⚡ Normal Mode (Concise)**: Built for rapid live scanning (<250 words) — confident opening thesis, 3-5 bold keyword bullets, compact ASCII diagram/code snippet, gotcha.
+  - **🧠 Detailed Mode (Deep Dive)**: Masterclass architectural answer (~1600 tokens) — Executive Summary, JVM/kernel mechanics & internal architecture, production code/distributed diagrams, trade-offs, failure modes & mitigations.
+  - **Instant Switching**: Switch anytime via the pinned top bar toggle `[⚡ Normal | 🧠 Detailed]`, or tap `🧠 Deep Dive` / `⚡ Make Concise` on any card to re-run that specific question!
+- **Interactive Phone Controls**:
+  - **✏️ Edit Question**: Modify any transcription or pasted question right on your phone and re-solve instantly.
+  - **🔄 Alt Solution / Rewrite**: One-tap trigger on the question card or right above the code/diagram to rewrite with an alternative implementation (e.g. Subquery vs Window Function, Iterative vs Recursive, different SQL dialect or design pattern).
 - **Engineered for Live Answers**:
   - Structured into **SAY THIS FIRST**, **KEY POINTS**, **CODE / ASCII DIAGRAM**, and **GOTCHAS**.
   - Smart triggers: generates compact ASCII diagrams for architecture/lifecycle questions, concise code snippets for implementation questions, or skips straight to bullets for quick definitions.

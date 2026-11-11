@@ -12,7 +12,9 @@ import threading
 import time
 import wave
 from collections import deque
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional, Union
 
 import numpy as np
 from dotenv import load_dotenv
@@ -37,7 +39,7 @@ SILENCE_DURATION = float(os.getenv("SILENCE_DURATION", "1.8"))
 MIN_SPEECH_DURATION = 1.0
 
 PW_TARGET = os.getenv("PW_TARGET", "58")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -97,8 +99,10 @@ def build_system_prompt() -> str:
 - **System design / architecture questions**:
   → ALWAYS include an ASCII component diagram inside ```text block
   → Max 8 lines, under 35 chars wide
-- **Code-specific questions** (e.g., "how to implement X", "write code for"):
-  → Include code snippet, max 8 lines, production-grade, no boilerplate
+- **Code-specific questions** (e.g., "how to implement X", "write code for", LeetCode/algorithm/SQL):
+  → ALWAYS wrap inside markdown code block with language (e.g. ```java, ```sql, ```python)
+  → Use 100% syntactically correct code with complete types and generics (e.g. List<List<Integer>>, Map<Integer, Integer>)
+  → Clean, production-grade, no boilerplate
 - **Simple definition / comparison questions**:
   → SKIP this section entirely
 - NEVER include both code AND diagram — pick the one that adds more value
@@ -112,6 +116,43 @@ def build_system_prompt() -> str:
 4. Write in SPEAKABLE language — what to SAY, not what to READ.
 5. Bold the keyword in each bullet so the candidate can scan instantly.
 6. Prefer concrete numbers and examples over abstract explanations.
+"""
+
+
+def build_detailed_system_prompt() -> str:
+    resume, jd = load_context_data()
+    return f"""You are an elite, principal-level technical interview copilot assisting a candidate in a senior engineering interview.
+The candidate selected DETAILED DEEP-DIVE MODE to deliver an authoritative, masterclass response with architectural depth and senior engineering nuance.
+
+### Candidate Background:
+{resume}
+
+### Target Role Context:
+{jd if jd else "Senior Software Engineer (Backend, Concurrency & Distributed Systems)"}
+
+### DETAILED ANSWER STRUCTURE — Format in these 4 comprehensive sections:
+
+### 🎯 1. EXECUTIVE SUMMARY & THESIS
+- Direct, confident, senior-level opening answering the question with precise architectural terminology.
+- State the industry best practice approach immediately.
+
+### 🧠 2. DEEP-DIVE & INTERNAL ARCHITECTURE
+- Explain the underlying engineering mechanics (e.g. JVM memory layout, garbage collection impact, kernel scheduling, lock primitives & atomic CAS, network protocols, distributed consensus, CAP/PACELC trade-offs).
+- Detail latency vs throughput, consistency vs availability, CPU cache friendliness, and database indexing implications.
+- Contrast naive approaches with production-grade architectures.
+
+### 💻 3. PRODUCTION IMPLEMENTATION & ARCHITECTURE PATTERN
+- If architectural or flow-based: provide a clean plain-text ASCII Diagram / Flowchart (under 40 chars wide) inside ```text block, tagging actual technologies (Spring Boot, SQS, Redis, LiveKit, DynamoDB, PostgreSQL, etc.).
+- If code-based: provide clean, robust, production-grade code wrapped inside markdown code blocks (```java, ```sql, ```python) with complete syntax and generic types (e.g. List<List<Integer>>, Map<Integer, Integer>).
+- Explicitly connect to how the candidate solved similar challenges at Samsung or Mastercard.
+
+### 🛡️ 4. TRADE-OFFS, FAILURE MODES & SENIOR GOTCHAS
+- 3-4 real-world production traps (e.g., thread starvation, deadlocks, connection pool exhaustion, unhandled rejected execution, cache stampede, split-brain).
+- Mitigation strategies, resiliency patterns (circuit breaker, rate limiter, backpressure), and observability metrics.
+
+### GUIDELINES:
+- Deliver deep technical substance, highly organized and professional.
+- Do NOT use filler greetings ("Sure!", "Great question!"). Begin immediately with Section 1.
 """
 
 # ==============================================================================
@@ -218,6 +259,117 @@ PHONE_HTML = """<!DOCTYPE html>
             align-items: center;
             border-bottom: 1px solid #27272a;
             padding-bottom: 4px;
+        }
+        .card-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .action-pill {
+            background: #18181b;
+            border: 1px solid #3f3f46;
+            color: #d4d4d8;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s ease;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .action-pill:active { transform: scale(0.96); }
+        .action-pill.edit {
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.4);
+            background: rgba(245, 158, 11, 0.08);
+        }
+        .action-pill.edit:active { background: rgba(245, 158, 11, 0.25); }
+        .action-pill.alt {
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.4);
+            background: rgba(56, 189, 248, 0.08);
+        }
+        .action-pill.alt:active { background: rgba(56, 189, 248, 0.25); }
+        .action-pill.deep {
+            color: #c084fc;
+            border-color: rgba(192, 132, 252, 0.4);
+            background: rgba(192, 132, 252, 0.08);
+        }
+        .action-pill.deep:active { background: rgba(192, 132, 252, 0.25); }
+        .mode-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 10px;
+            margin-left: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .mode-badge.normal {
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        .mode-badge.detailed {
+            background: rgba(192, 132, 252, 0.15);
+            color: #c084fc;
+            border: 1px solid rgba(192, 132, 252, 0.3);
+        }
+        #mode-toggle-group {
+            display: inline-flex;
+            background: #09090b;
+            padding: 2px;
+            border-radius: 8px;
+            border: 1px solid #27272a;
+        }
+        .mode-toggle-btn {
+            background: transparent;
+            border: none;
+            color: #71717a;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .mode-toggle-btn#mode-btn-normal.active {
+            color: #22c55e;
+            background: #142918;
+            border: 1px solid rgba(34, 197, 94, 0.4);
+        }
+        .mode-toggle-btn#mode-btn-detailed.active {
+            color: #c084fc;
+            background: #28143d;
+            border: 1px solid rgba(192, 132, 252, 0.4);
+        }
+        .inline-alt-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid #0284c7;
+            color: #38bdf8;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-left: auto;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .inline-alt-btn:active {
+            background: rgba(56, 189, 248, 0.3);
+            transform: scale(0.96);
         }
         .card-a ul { padding-left: 20px; margin: 6px 0; }
         .card-a li { margin-bottom: 8px; }
@@ -338,11 +490,14 @@ PHONE_HTML = """<!DOCTYPE html>
 </head>
 <body>
     <div id="status-bar">
-        <div>
+        <div style="display:flex; align-items:center;">
             <span id="status-dot"></span>
             <span id="status-text">Connecting...</span>
         </div>
-        <span id="clock"></span>
+        <div id="mode-toggle-group">
+            <button id="mode-btn-normal" class="mode-toggle-btn active" onclick="switchGlobalMode('normal')">⚡ Normal</button>
+            <button id="mode-btn-detailed" class="mode-toggle-btn" onclick="switchGlobalMode('detailed')">🧠 Detailed</button>
+        </div>
     </div>
 
     <div id="content">
@@ -362,13 +517,16 @@ PHONE_HTML = """<!DOCTYPE html>
         <div id="modal-backdrop" onclick="closeModal()"></div>
         <div id="modal-content">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <span style="font-weight:700; font-size:14px; color:#f59e0b;">📝 Paste Interview / Chat Question</span>
+                <span id="modal-title" style="font-weight:700; font-size:14px; color:#f59e0b;">📝 Paste Interview / Chat Question</span>
                 <span onclick="closeModal()" style="color:#71717a; font-size:20px; cursor:pointer;">&times;</span>
             </div>
-            <textarea id="modal-input" placeholder="Paste coding problem, SQL query, or prompt from Zoom/Meet chat..."></textarea>
-            <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                <button onclick="closeModal()" style="background:#27272a; color:#a1a1aa; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">Cancel</button>
-                <button onclick="submitModalQuestion()" style="background:#22c55e; color:#000; font-weight:700; border:none; padding:8px 20px; border-radius:6px; cursor:pointer;">Solve ⚡</button>
+            <textarea id="modal-input" placeholder="Paste or edit coding problem, SQL query, or prompt from Zoom/Meet chat..."></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:8px;">
+                <button onclick="closeModal()" style="background:#27272a; color:#a1a1aa; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;">Cancel</button>
+                <div style="display:flex; gap:8px;">
+                    <button id="modal-alt-btn" onclick="submitModalQuestion(true)" style="background:#0284c7; color:#fff; font-weight:700; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;">Alt Way 🔄</button>
+                    <button id="modal-submit-btn" onclick="submitModalQuestion(false)" style="background:#22c55e; color:#000; font-weight:700; border:none; padding:8px 18px; border-radius:6px; cursor:pointer;">Solve ⚡</button>
+                </div>
             </div>
         </div>
     </div>
@@ -377,7 +535,8 @@ PHONE_HTML = """<!DOCTYPE html>
         const content = document.getElementById('content');
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
-        const clockEl = document.getElementById('clock');
+        const cardQuestions = {};
+        let currentAppMode = 'normal';
         let ws;
 
         async function keepAwake() {
@@ -390,20 +549,108 @@ PHONE_HTML = """<!DOCTYPE html>
             if (document.visibilityState === 'visible') keepAwake();
         });
 
-        setInterval(() => {
-            clockEl.textContent = new Date().toLocaleTimeString();
-        }, 1000);
+        function switchGlobalMode(mode) {
+            currentAppMode = mode;
+            updateModeButtons(mode);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'set_mode', mode: mode }));
+            } else {
+                fetch('/mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: mode })
+                }).catch(e => console.error(e));
+            }
+        }
 
-        function formatMarkdown(text) {
-            let h = text
-                .replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<pre><code>$2</code></pre>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
+        function updateModeButtons(mode) {
+            const btnNorm = document.getElementById('mode-btn-normal');
+            const btnDet = document.getElementById('mode-btn-detailed');
+            if (btnNorm) btnNorm.className = 'mode-toggle-btn' + (mode === 'normal' ? ' active' : '');
+            if (btnDet) btnDet.className = 'mode-toggle-btn' + (mode === 'detailed' ? ' active' : '');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function cleanQuestionText(q) {
+            if (!q) return '';
+            return q
+                .replace(/^\\[.*?\\]\\s*/, '')
+                .replace(/^🎤\\s*"?/, '')
+                .replace(/"?\\s*$/, '')
+                .trim();
+        }
+
+        function formatMarkdown(text, cardId) {
+            if (!text) return '';
+
+            // 1. Extract and escape fenced code blocks
+            const codeBlocks = [];
+            let h = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, (match, lang, code) => {
+                const id = '___CODE_BLOCK_' + codeBlocks.length + '___';
+                const escaped = code
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                codeBlocks.push('<pre><code>' + escaped + '</code></pre>');
+                return id;
+            });
+
+            // 2. Extract and escape inline code
+            const inlineCodes = [];
+            h = h.replace(/`([^`]+)`/g, (match, code) => {
+                const id = '___INLINE_CODE_' + inlineCodes.length + '___';
+                const escaped = code
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                inlineCodes.push('<code>' + escaped + '</code>');
+                return id;
+            });
+
+            // 3. Escape raw < and > so generic types (e.g. List<Integer>) are not swallowed by the browser as HTML tags
+            h = h.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            // 4. Format section headers (Normal & Detailed modes)
+            h = h
+                .replace(/(?:###\\s*|\\*\\*)?(🎯 SAY THIS FIRST[^*<\\n]*)(?:\\*\\*)?/gi, '<div class="section-header" style="color:#f59e0b;">$1</div>')
+                .replace(/(?:###\\s*|\\*\\*)?(📌 KEY POINTS[^*<\\n]*)(?:\\*\\*)?/gi, '<div class="section-header" style="color:#38bdf8;">$1</div>')
+                .replace(/(?:###\\s*|\\*\\*)?(💻 CODE \\/ DIAGRAM[^*<\\n]*)(?:\\*\\*)?/gi, (match, p1) => {
+                    return `<div class="section-header" style="color:#a78bfa; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;"><span>${p1}</span>${cardId ? `<button class="inline-alt-btn" onclick="triggerAlt('${cardId}')">🔄 Rewrite another way</button>` : ''}</div>`;
+                })
+                .replace(/(?:###\\s*|\\*\\*)?(⚡ GOTCHA[^*<\\n]*)(?:\\*\\*)?/gi, '<div class="section-header" style="color:#fbbf24;">$1</div>')
+                // Detailed Mode headers
+                .replace(/(?:###\\s*|\\*\\*)?(🎯 1\\.\\s*EXECUTIVE SUMMARY[^*<\\n]*)(?:\\*\\*)?/gi, '<div class="section-header" style="color:#f59e0b;">$1</div>')
+                .replace(/(?:###\\s*|\\*\\*)?(🧠 2\\.\\s*DEEP-DIVE[^*<\\n]*)(?:\\*\\*)?/gi, '<div class="section-header" style="color:#38bdf8;">$1</div>')
+                .replace(/(?:###\\s*|\\*\\*)?(💻 3\\.\\s*PRODUCTION IMPLEMENTATION[^*<\\n]*)(?:\\*\\*)?/gi, (match, p1) => {
+                    return `<div class="section-header" style="color:#a78bfa; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;"><span>${p1}</span>${cardId ? `<button class="inline-alt-btn" onclick="triggerAlt('${cardId}')">🔄 Rewrite another way</button>` : ''}</div>`;
+                })
+                .replace(/(?:###\\s*|\\*\\*)?(🛡️ 4\\.\\s*TRADE-OFFS[^*<\\n]*)(?:\\*\\*)?/gi, '<div class="section-header" style="color:#ef4444;">$1</div>')
+                // General bold and markdown headers
                 .replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>')
                 .replace(/^### (.*$)/gm, '<div class="section-header">$1</div>')
                 .replace(/^## (.*$)/gm, '<div class="section-header" style="color:#60a5fa;">$1</div>')
                 .replace(/^[\\-\\*•]\\s+(.+)$/gm, '<li>$1</li>');
+
             h = h.replace(/((?:<li>.*<\\/li>\\s*)+)/g, '<ul>$1</ul>');
             h = h.replace(/\\n/g, '<br>');
+
+            // 5. Restore escaped code blocks and inline code
+            for (let i = 0; i < codeBlocks.length; i++) {
+                h = h.replace('___CODE_BLOCK_' + i + '___', codeBlocks[i]);
+            }
+            for (let i = 0; i < inlineCodes.length; i++) {
+                h = h.replace('___INLINE_CODE_' + i + '___', inlineCodes[i]);
+            }
+
             return h;
         }
 
@@ -422,6 +669,8 @@ PHONE_HTML = """<!DOCTYPE html>
         }
 
         function openModal() {
+            document.getElementById('modal-title').textContent = '📝 Paste Interview / Chat Question';
+            document.getElementById('modal-input').value = '';
             document.getElementById('ask-modal').style.display = 'flex';
             setTimeout(() => document.getElementById('modal-input').focus(), 100);
         }
@@ -430,16 +679,79 @@ PHONE_HTML = """<!DOCTYPE html>
             document.getElementById('ask-modal').style.display = 'none';
         }
 
-        function submitModalQuestion() {
+        function editCardQuestion(cardId) {
+            const q = cardQuestions[cardId] || '';
+            document.getElementById('modal-title').textContent = '✏️ Edit Question';
+            document.getElementById('modal-input').value = q;
+            document.getElementById('ask-modal').style.display = 'flex';
+            setTimeout(() => {
+                const input = document.getElementById('modal-input');
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            }, 100);
+        }
+
+        function toggleCardDepth(cardId, targetMode) {
+            const q = cardQuestions[cardId];
+            if (!q) return;
+            const label = targetMode === 'detailed' ? 'Deep Dive' : 'Concise View';
+            sendQuestion(q, label, targetMode, false);
+        }
+
+        function triggerAlt(cardId) {
+            const q = cardQuestions[cardId];
+            if (!q) return;
+            sendQuestion(q, 'Alt Solution', currentAppMode, true);
+        }
+
+        function sendQuestion(q, source, mode, isAlt) {
+            const trimmed = q.trim();
+            if (!trimmed) return;
+
+            const useMode = mode || currentAppMode;
+            removeBanner();
+            const existing = document.getElementById('loading-card');
+            if (existing) existing.remove();
+
+            const loadCard = document.createElement('div');
+            loadCard.className = 'card loading';
+            loadCard.id = 'loading-card';
+            const altTag = isAlt ? '🔄 Alt Solution for' : '🎤';
+            const depthTag = useMode === 'detailed' ? ' [🧠 Detailed]' : '';
+            loadCard.innerHTML = `
+                <div class="card-q">${altTag}: "${escapeHtml(trimmed)}"${depthTag}</div>
+                <div class="spinner">⏳ Generating ${useMode === 'detailed' ? 'detailed architectural' : 'concise'} answer...</div>
+            `;
+            content.prepend(loadCard);
+
+            const payload = {
+                type: 'ask',
+                question: trimmed,
+                source: source || 'Phone',
+                mode: useMode,
+                is_alt: Boolean(isAlt)
+            };
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(payload));
+            } else {
+                fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).catch(err => console.error('Fetch fallback error:', err));
+            }
+        }
+
+        function submitModalQuestion(isAlt) {
             const val = document.getElementById('modal-input').value.trim();
             if (!val) return;
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'ask', question: val, source: 'phone' }));
-                document.getElementById('modal-input').value = '';
-                closeModal();
-            } else {
-                alert('Connecting to server...');
-            }
+            const isEdit = document.getElementById('modal-title').textContent.includes('Edit');
+            const source = isEdit
+                ? (isAlt ? 'Edited Alt' : 'Edited')
+                : (isAlt ? 'Alt Solution' : 'Phone Input');
+            sendQuestion(val, source, currentAppMode, Boolean(isAlt));
+            closeModal();
         }
 
         function connect() {
@@ -460,6 +772,11 @@ PHONE_HTML = """<!DOCTYPE html>
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
 
+                if (data.type === 'mode_changed') {
+                    currentAppMode = data.mode;
+                    updateModeButtons(data.mode);
+                }
+
                 if (data.type === 'transcription') {
                     removeBanner();
                     const existing = document.getElementById('loading-card');
@@ -468,9 +785,10 @@ PHONE_HTML = """<!DOCTYPE html>
                     const card = document.createElement('div');
                     card.className = 'card loading';
                     card.id = 'loading-card';
+                    const depthTag = data.mode === 'detailed' ? ' [🧠 Detailed]' : '';
                     card.innerHTML = `
-                        <div class="card-q">🎤 "${data.text}"</div>
-                        <div class="spinner">⏳ Generating elaborated answer...</div>
+                        <div class="card-q">🎤 "${escapeHtml(data.text)}"${depthTag}</div>
+                        <div class="spinner">⏳ Generating answer...</div>
                     `;
                     content.prepend(card);
                 }
@@ -480,12 +798,28 @@ PHONE_HTML = """<!DOCTYPE html>
                     const existing = document.getElementById('loading-card');
                     if (existing) existing.remove();
 
+                    const cardId = 'card_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+                    cardQuestions[cardId] = cleanQuestionText(data.question);
+                    const cardMode = data.mode || currentAppMode;
+                    const isDet = cardMode === 'detailed';
+
                     const card = document.createElement('div');
                     card.className = 'card';
+                    card.id = cardId;
                     card.innerHTML = `
-                        <div class="card-meta"><span>${data.time}</span><span>${data.model || ''}</span></div>
-                        <div class="card-q">🎤 "${data.question}"</div>
-                        <div class="card-a">${formatMarkdown(data.answer)}</div>
+                        <div class="card-meta">
+                            <span>${data.time} <span class="mode-badge ${cardMode}">${isDet ? '🧠 Detailed' : '⚡ Normal'}</span></span>
+                            <span>${data.model || ''}</span>
+                        </div>
+                        <div class="card-q">🎤 "${escapeHtml(data.question)}"</div>
+                        <div class="card-actions">
+                            <button class="action-pill edit" onclick="editCardQuestion('${cardId}')">✏️ Edit</button>
+                            <button class="action-pill alt" onclick="triggerAlt('${cardId}')">🔄 Alt Solution</button>
+                            <button class="action-pill deep" onclick="toggleCardDepth('${cardId}', '${isDet ? 'normal' : 'detailed'}')">
+                                ${isDet ? '⚡ Make Concise' : '🧠 Deep Dive'}
+                            </button>
+                        </div>
+                        <div class="card-a">${formatMarkdown(data.answer, cardId)}</div>
                     `;
                     content.prepend(card);
 
@@ -495,7 +829,7 @@ PHONE_HTML = """<!DOCTYPE html>
                 if (data.type === 'error') {
                     const card = document.createElement('div');
                     card.className = 'card error';
-                    card.innerHTML = `<div style="color:#ef4444;font-size:13px;">❌ ${data.text}</div>`;
+                    card.innerHTML = `<div style="color:#ef4444;font-size:13px;">❌ ${escapeHtml(data.text)}</div>`;
                     content.prepend(card);
                 }
 
@@ -559,13 +893,20 @@ FALLBACK_MODELS = [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
 ]
+current_answering_mode: str = "normal"  # "normal" or "detailed"
 
 
-def generate_response(question: str) -> tuple[str, str]:
+def generate_response(question: str, mode: str = "normal", is_alt: bool = False) -> tuple[str, str]:
     from groq import Groq
 
     client = Groq(api_key=GROQ_API_KEY)
-    system_prompt = build_system_prompt()
+
+    if mode == "detailed":
+        system_prompt = build_detailed_system_prompt()
+        max_tokens_val = 1600
+    else:
+        system_prompt = build_system_prompt()
+        max_tokens_val = 800
 
     history = ""
     if transcript_history:
@@ -574,11 +915,40 @@ def generate_response(question: str) -> tuple[str, str]:
             f'- Interviewer asked: "{h["question"]}"' for h in recent
         )
 
-    user_message = (
-        f"{history}\n\n"
-        f'Interviewer just said:\n"{question}"\n\n'
-        f"Generate the comprehensive, elaborated 4-part response:"
-    )
+    if is_alt:
+        if mode == "detailed":
+            user_message = (
+                f"{history}\n\n"
+                f'Interviewer requested a DETAILED ALTERNATIVE APPROACH / DIFFERENT ARCHITECTURAL IMPLEMENTATION for:\n"{question}"\n\n'
+                f"STRICT INSTRUCTIONS FOR DETAILED ALTERNATIVE:\n"
+                f"1. Provide a completely DIFFERENT way to solve this query / code / design problem than the standard approach (e.g. if previous used Window Function, use Subquery/JOIN/MAX; if iterative, use recursive/Stream API; if SQL, provide a distinct query strategy; if design, provide an alternate architecture pattern).\n"
+                f"2. In **💻 3. PRODUCTION IMPLEMENTATION & ARCHITECTURE PATTERN**, provide this working alternative code or diagram.\n"
+                f"3. In **🧠 2. DEEP-DIVE & INTERNAL ARCHITECTURE**, contrast both paradigms deeply: algorithmic complexity, memory layout, indexing, concurrency behavior, and production scale trade-offs.\n"
+                f"4. Follow the comprehensive 4-part structure (EXECUTIVE SUMMARY, DEEP-DIVE, PRODUCTION IMPLEMENTATION, TRADE-OFFS & GOTCHAS)."
+            )
+        else:
+            user_message = (
+                f"{history}\n\n"
+                f'Interviewer requested an ALTERNATIVE APPROACH / DIFFERENT IMPLEMENTATION for:\n"{question}"\n\n'
+                f"STRICT INSTRUCTIONS FOR ALTERNATIVE / REWRITE:\n"
+                f"1. Provide a completely DIFFERENT way to solve this query / code / design problem than the standard approach (e.g. if previous used Window Function RANK/DENSE_RANK, use Subquery/JOIN/MAX; if iterative, use recursive/Stream API; if SQL, provide a distinct query strategy; if design, provide an alternate architecture pattern).\n"
+                f"2. In **💻 CODE / DIAGRAM**, provide this working alternative code or diagram.\n"
+                f"3. In **📌 KEY POINTS**, explain why this alternative exists, its performance/readability trade-offs, and when to choose it over the primary approach.\n"
+                f"4. Keep the exact 4-part structure (SAY THIS FIRST, KEY POINTS, CODE / DIAGRAM, GOTCHA) under 250 words."
+            )
+    else:
+        if mode == "detailed":
+            user_message = (
+                f"{history}\n\n"
+                f'Interviewer asked:\n"{question}"\n\n'
+                f"Generate the comprehensive, deep-dive 4-part technical response:"
+            )
+        else:
+            user_message = (
+                f"{history}\n\n"
+                f'Interviewer just said:\n"{question}"\n\n'
+                f"Generate the concise, scannable 4-part response:"
+            )
 
     last_error = None
     for model_name in dict.fromkeys(FALLBACK_MODELS):
@@ -590,7 +960,7 @@ def generate_response(question: str) -> tuple[str, str]:
                     {"role": "user", "content": user_message},
                 ],
                 temperature=0.3,
-                max_tokens=800,  # Room for diagrams on lifecycle/flow questions
+                max_tokens=max_tokens_val,
             )
             return response.choices[0].message.content, model_name
         except Exception as err:
@@ -611,29 +981,53 @@ connected_clients: list[WebSocket] = []
 class AskPayload(BaseModel):
     question: str
     source: str = "chat"
+    mode: str = ""
+    is_alt: bool = False
 
 
-async def process_and_broadcast_question(question: str, source_label: str):
+class ModePayload(BaseModel):
+    mode: str
+
+
+AskPayload.model_rebuild()
+ModePayload.model_rebuild()
+
+
+async def process_and_broadcast_question(
+    question: str,
+    source_label: str,
+    mode: str = "",
+    is_alt: bool = False
+):
     """Processes a text/chat question and broadcasts progress + answer to phone."""
     time_str = time.strftime("%H:%M:%S")
+    prefix = f"[{source_label}]" if source_label else ""
+    display_q = f"{prefix} {question}".strip()
+    effective_mode = mode if mode in ("normal", "detailed") else current_answering_mode
+
     await broadcast({
         "type": "transcription",
-        "text": f"[{source_label}]: {question}"
+        "text": display_q,
+        "mode": effective_mode,
     })
     loop = asyncio.get_running_loop()
     try:
-        answer, model_used = await loop.run_in_executor(None, generate_response, question)
+        answer, model_used = await loop.run_in_executor(
+            None, generate_response, question, effective_mode, is_alt
+        )
         transcript_history.append({
-            "question": f"[{source_label}] {question}",
+            "question": display_q,
             "answer": answer,
-            "time": time_str
+            "time": time_str,
+            "mode": effective_mode,
         })
         await broadcast({
             "type": "qa",
-            "question": f"[{source_label}] {question}",
+            "question": display_q,
             "answer": answer,
             "time": time_str,
-            "model": model_used
+            "model": model_used,
+            "mode": effective_mode,
         })
         return answer, model_used
     except Exception as e:
@@ -648,7 +1042,27 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "connected_clients": len(connected_clients)}
+    return {
+        "status": "ok",
+        "connected_clients": len(connected_clients),
+        "mode": current_answering_mode,
+    }
+
+
+@app.get("/mode")
+async def get_mode_endpoint():
+    return {"mode": current_answering_mode}
+
+
+@app.post("/mode")
+async def set_mode_endpoint(payload: ModePayload):
+    global current_answering_mode
+    if payload.mode in ("normal", "detailed"):
+        current_answering_mode = payload.mode
+        print(f"🔄 Mode set to: {current_answering_mode.upper()}")
+        await broadcast({"type": "mode_changed", "mode": current_answering_mode})
+        return {"status": "ok", "mode": current_answering_mode}
+    return {"status": "error", "message": "Invalid mode. Choose 'normal' or 'detailed'"}
 
 
 @app.post("/ask")
@@ -656,25 +1070,43 @@ async def ask_endpoint(payload: AskPayload):
     q = payload.question.strip()
     if not q:
         return {"status": "error", "message": "Empty question"}
-    source_label = "Clipboard" if payload.source == "clipboard" else "Chat Question"
-    asyncio.create_task(process_and_broadcast_question(q, source_label))
-    return {"status": "processing", "question": q}
+    source_label = "Clipboard" if payload.source == "clipboard" else payload.source
+    effective_mode = payload.mode if payload.mode in ("normal", "detailed") else current_answering_mode
+    asyncio.create_task(process_and_broadcast_question(
+        q, source_label, mode=effective_mode, is_alt=payload.is_alt
+    ))
+    return {"status": "processing", "question": q, "mode": effective_mode}
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    global current_answering_mode
     await websocket.accept()
     connected_clients.append(websocket)
     print(f"📱 Phone connected! (Total clients: {len(connected_clients)})")
+    # Sync active mode immediately to phone
+    await websocket.send_text(json.dumps({"type": "mode_changed", "mode": current_answering_mode}))
     try:
         while True:
             raw = await websocket.receive_text()
             try:
                 data = json.loads(raw)
-                if data.get("type") == "ask":
+                msg_type = data.get("type")
+                if msg_type == "ask":
                     q = data.get("question", "").strip()
+                    source = data.get("source", "Phone Input")
+                    mode = data.get("mode")
+                    is_alt = bool(data.get("is_alt", False))
                     if q:
-                        asyncio.create_task(process_and_broadcast_question(q, "Phone Input"))
+                        asyncio.create_task(process_and_broadcast_question(
+                            q, source, mode=mode or "", is_alt=is_alt
+                        ))
+                elif msg_type == "set_mode":
+                    new_mode = data.get("mode", "normal")
+                    if new_mode in ("normal", "detailed"):
+                        current_answering_mode = new_mode
+                        print(f"🔄 Switched answering mode to: {current_answering_mode.upper()}")
+                        await broadcast({"type": "mode_changed", "mode": current_answering_mode})
             except Exception:
                 pass
     except WebSocketDisconnect:
@@ -767,15 +1199,17 @@ def audio_processing_loop(loop: asyncio.AbstractEventLoop):
                                         loop,
                                     )
 
-                                    # 2. Generate Elaborated Answer
-                                    answer, model_used = generate_response(text)
-                                    print(f"✅ Generated answer via {model_used}\n")
+                                    active_mode = current_answering_mode
+                                    # 2. Generate Answer
+                                    answer, model_used = generate_response(text, mode=active_mode)
+                                    print(f"✅ Generated answer via {model_used} [{active_mode.upper()} MODE]\n")
 
                                     time_str = time.strftime("%H:%M:%S")
                                     transcript_history.append({
                                         "question": text,
                                         "answer": answer,
                                         "time": time_str,
+                                        "mode": active_mode,
                                     })
 
                                     asyncio.run_coroutine_threadsafe(
@@ -785,6 +1219,7 @@ def audio_processing_loop(loop: asyncio.AbstractEventLoop):
                                             "answer": answer,
                                             "time": time_str,
                                             "model": model_used,
+                                            "mode": active_mode,
                                         }),
                                         loop,
                                     )
@@ -813,10 +1248,13 @@ def audio_processing_loop(loop: asyncio.AbstractEventLoop):
         process.wait()
 
 
-@app.on_event("startup")
-async def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     loop = asyncio.get_running_loop()
     threading.Thread(target=audio_processing_loop, args=(loop,), daemon=True).start()
+    yield
+
+app.router.lifespan_context = lifespan
 
 
 if __name__ == "__main__":
