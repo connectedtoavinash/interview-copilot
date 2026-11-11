@@ -130,29 +130,45 @@ The candidate selected DETAILED DEEP-DIVE MODE to deliver an authoritative, mast
 ### Target Role Context:
 {jd if jd else "Senior Software Engineer (Backend, Concurrency & Distributed Systems)"}
 
+### DEEP-DIVE QUALITY STANDARDS
+Your answer must be materially better than the normal mode answer. This is not a longer version of a generic explanation — it is a higher standard of engineering reasoning.
+
+- Open with a crisp, confident thesis that answers the question immediately.
+- Every claim must be grounded in a concrete mechanism, pattern, trade-off, or production failure mode.
+- Use precise engineering language: throughput, latency, consistency, durability, contention, backpressure, observability, idempotency, backpressure, retry semantics, and failure isolation.
+- Prefer specific technologies, architectures, and examples from the candidate background or the role context.
+- Avoid generic filler, slogans, or vague statements like "it depends" without explaining the conditions and constraints.
+- Sound like a senior engineer talking to a hiring panel, not a tutorial or blog article.
+
 ### DETAILED ANSWER STRUCTURE — Format in these 4 comprehensive sections:
 
 ### 🎯 1. EXECUTIVE SUMMARY & THESIS
 - Direct, confident, senior-level opening answering the question with precise architectural terminology.
 - State the industry best practice approach immediately.
+- Give a 1-sentence answer to the question + 1-sentence reasoning behind it.
 
 ### 🧠 2. DEEP-DIVE & INTERNAL ARCHITECTURE
 - Explain the underlying engineering mechanics (e.g. JVM memory layout, garbage collection impact, kernel scheduling, lock primitives & atomic CAS, network protocols, distributed consensus, CAP/PACELC trade-offs).
-- Detail latency vs throughput, consistency vs availability, CPU cache friendliness, and database indexing implications.
-- Contrast naive approaches with production-grade architectures.
+- Detail latency vs throughput, consistency vs availability, CPU cache friendliness, database indexing implications, and concurrency behavior.
+- Contrast naive approaches with production-grade architectures and explain why one is preferred under real-world constraints.
+- Include operational details such as batching, retries, rate limits, idempotency, backpressure, and observability when relevant.
 
 ### 💻 3. PRODUCTION IMPLEMENTATION & ARCHITECTURE PATTERN
 - If architectural or flow-based: provide a clean plain-text ASCII Diagram / Flowchart (under 40 chars wide) inside ```text block, tagging actual technologies (Spring Boot, SQS, Redis, LiveKit, DynamoDB, PostgreSQL, etc.).
 - If code-based: provide clean, robust, production-grade code wrapped inside markdown code blocks (```java, ```sql, ```python) with complete syntax and generic types (e.g. List<List<Integer>>, Map<Integer, Integer>).
-- Explicitly connect to how the candidate solved similar challenges at Samsung or Mastercard.
+- The implementation should be production-grade, complete, and directly tied to the architectural decision.
+- Explicitly connect to how the candidate solved similar challenges at Samsung or Mastercard when relevant.
 
 ### 🛡️ 4. TRADE-OFFS, FAILURE MODES & SENIOR GOTCHAS
 - 3-4 real-world production traps (e.g., thread starvation, deadlocks, connection pool exhaustion, unhandled rejected execution, cache stampede, split-brain).
 - Mitigation strategies, resiliency patterns (circuit breaker, rate limiter, backpressure), and observability metrics.
+- End with a concise interview-ready takeaway that demonstrates judgment and operational maturity.
 
 ### GUIDELINES:
-- Deliver deep technical substance, highly organized and professional.
+- Deliver deep technical substance, highly organized, and professional.
 - Do NOT use filler greetings ("Sure!", "Great question!"). Begin immediately with Section 1.
+- Keep the answer crisp enough for an interview, but technically strong enough to impress a senior engineer.
+- Prefer clear reasoning and concrete examples over abstraction.
 """
 
 # ==============================================================================
@@ -903,10 +919,12 @@ def generate_response(question: str, mode: str = "normal", is_alt: bool = False)
 
     if mode == "detailed":
         system_prompt = build_detailed_system_prompt()
-        max_tokens_val = 1600
+        max_tokens_val = 1800
+        temperature = 0.2
     else:
         system_prompt = build_system_prompt()
         max_tokens_val = 800
+        temperature = 0.3
 
     history = ""
     if transcript_history:
@@ -924,7 +942,7 @@ def generate_response(question: str, mode: str = "normal", is_alt: bool = False)
                 f"1. Provide a completely DIFFERENT way to solve this query / code / design problem than the standard approach (e.g. if previous used Window Function, use Subquery/JOIN/MAX; if iterative, use recursive/Stream API; if SQL, provide a distinct query strategy; if design, provide an alternate architecture pattern).\n"
                 f"2. In **💻 3. PRODUCTION IMPLEMENTATION & ARCHITECTURE PATTERN**, provide this working alternative code or diagram.\n"
                 f"3. In **🧠 2. DEEP-DIVE & INTERNAL ARCHITECTURE**, contrast both paradigms deeply: algorithmic complexity, memory layout, indexing, concurrency behavior, and production scale trade-offs.\n"
-                f"4. Follow the comprehensive 4-part structure (EXECUTIVE SUMMARY, DEEP-DIVE, PRODUCTION IMPLEMENTATION, TRADE-OFFS & GOTCHAS)."
+                f"4. Follow the comprehensive 4-part structure (EXECUTIVE SUMMARY, DEEP-DIVE, PRODUCTION IMPLEMENTATION, TRADE-OFFS & GOTCHAS) with high engineering standards and crisp reasoning."
             )
         else:
             user_message = (
@@ -941,7 +959,7 @@ def generate_response(question: str, mode: str = "normal", is_alt: bool = False)
             user_message = (
                 f"{history}\n\n"
                 f'Interviewer asked:\n"{question}"\n\n'
-                f"Generate the comprehensive, deep-dive 4-part technical response:"
+                f"Generate a high-standard, comprehensive deep-dive 4-part technical response with senior-level engineering depth, concrete trade-offs, and crisp production reasoning:"
             )
         else:
             user_message = (
@@ -959,7 +977,7 @@ def generate_response(question: str, mode: str = "normal", is_alt: bool = False)
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
-                temperature=0.3,
+                temperature=temperature,
                 max_tokens=max_tokens_val,
             )
             return response.choices[0].message.content, model_name
