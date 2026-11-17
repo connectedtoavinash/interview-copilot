@@ -34,11 +34,11 @@ AUDIO_CHANNELS = 1
 CHUNK_DURATION = 0.5  # seconds
 CHUNK_SIZE = int(AUDIO_RATE * AUDIO_CHANNELS * 2 * CHUNK_DURATION)
 
-SILENCE_THRESHOLD = int(os.getenv("SILENCE_THRESHOLD", "300"))
+SILENCE_THRESHOLD = int(os.getenv("SILENCE_THRESHOLD", "120"))
 SILENCE_DURATION = float(os.getenv("SILENCE_DURATION", "1.8"))
 MIN_SPEECH_DURATION = 1.0
 
-PW_TARGET = os.getenv("PW_TARGET", "58")
+PW_TARGET = os.getenv("PW_TARGET", "@DEFAULT_MONITOR@")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
@@ -1149,34 +1149,82 @@ async def broadcast(message: dict):
 # ==============================================================================
 
 
+def resolve_audio_source() -> str:
+    target = PW_TARGET.strip()
+    if not target or target.lower() == "auto":
+        return "@DEFAULT_MONITOR@"
+
+    if target.isdecimal():
+        try:
+            result = subprocess.run(
+                ["wpctl", "inspect", target],
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+        except FileNotFoundError as e:
+            raise RuntimeError(
+                "wpctl is required to resolve a numeric PW_TARGET; "
+                "set PW_TARGET to @DEFAULT_MONITOR@ or a source name instead"
+            ) from e
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Could not inspect PipeWire node {target}; "
+                "set PW_TARGET to @DEFAULT_MONITOR@ or a source name instead"
+            ) from e
+
+        properties = {}
+        for line in result.stdout.splitlines():
+            key, separator, value = line.strip().partition("=")
+            if separator:
+                properties[key.strip().removeprefix("*").strip()] = value.strip().strip('"')
+
+        if properties.get("media.class") != "Audio/Sink":
+            raise RuntimeError(f"PipeWire node {target} is not an audio output sink")
+
+        sink_name = properties.get("node.name", "")
+        if not sink_name:
+            raise RuntimeError(f"PipeWire returned no node name for output sink {target}")
+        return f"{sink_name}.monitor"
+
+    return target
+
+
 def audio_processing_loop(loop: asyncio.AbstractEventLoop):
-    cmd = [
-        "pw-record",
-        "--target", PW_TARGET,
-        "--rate", str(AUDIO_RATE),
-        "--channels", str(AUDIO_CHANNELS),
-        "--format", "s16",
-        "--raw",
-        "-",
-    ]
-
-    print(f"🎧 Starting PipeWire capture on sink {PW_TARGET}...")
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-
-    audio_buffer = bytearray()
-    silence_count = 0
-    speech_detected = False
-    speech_chunks = 0
-
-    silence_chunks_needed = int(SILENCE_DURATION / CHUNK_DURATION)
-    min_speech_chunks = int(MIN_SPEECH_DURATION / CHUNK_DURATION)
-
-    print(f"🎤 Listening on sink {PW_TARGET} (threshold={SILENCE_THRESHOLD})...")
-
+    process: Optional[subprocess.Popen] = None
     try:
+        source = resolve_audio_source()
+        cmd = [
+            "parec",
+            f"--device={source}",
+            f"--rate={AUDIO_RATE}",
+            f"--channels={AUDIO_CHANNELS}",
+            "--format=s16le",
+            "--raw",
+        ]
+
+        print(f"🎧 Starting PipeWire capture from source {source}...")
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        if process.stdout is None:
+            raise RuntimeError("Audio capture did not provide an output stream")
+
+        audio_buffer = bytearray()
+        silence_count = 0
+        speech_detected = False
+        speech_chunks = 0
+
+        silence_chunks_needed = int(SILENCE_DURATION / CHUNK_DURATION)
+        min_speech_chunks = int(MIN_SPEECH_DURATION / CHUNK_DURATION)
+
+        print(f"🎤 Listening to audio (threshold={SILENCE_THRESHOLD})...")
+
         while True:
             chunk = process.stdout.read(CHUNK_SIZE)
             if not chunk:
+                return_code = process.wait()
+                if return_code != 0:
+                    raise RuntimeError(f"Audio capture exited with status {return_code}")
+                print("Audio capture stopped.")
                 break
 
             rms = calculate_rms(chunk)
@@ -1260,10 +1308,15 @@ def audio_processing_loop(loop: asyncio.AbstractEventLoop):
                             broadcast({"type": "status", "text": "Listening"}), loop
                         )
     except Exception as e:
-        print(f"Audio loop exception: {e}")
+        message = f"Audio capture error: {e}"
+        print(message)
+        asyncio.run_coroutine_threadsafe(
+            broadcast({"type": "error", "text": message}), loop
+        )
     finally:
-        process.terminate()
-        process.wait()
+        if process is not None and process.poll() is None:
+            process.terminate()
+            process.wait()
 
 
 @asynccontextmanager

@@ -31,6 +31,7 @@ An undetectable, real-time technical interview assistant that captures interview
 ### 1. Prerequisites
 - Linux (Ubuntu / Debian with PipeWire)
 - Python 3.10+
+- PipeWire's PulseAudio compatibility layer and `parec` (commonly provided by `pipewire-pulse` and `pulseaudio-utils`)
 - `wl-clipboard` and `xclip` (for clipboard shortcut):
   ```bash
   sudo apt install -y wl-clipboard xclip
@@ -46,7 +47,8 @@ An undetectable, real-time technical interview assistant that captures interview
    GROQ_API_KEY=gsk_your_groq_api_key
    GROQ_MODEL=qwen/qwen3.8-27b
    ```
-3. Update `resume.txt` and `job_description.txt` with your details.
+3. Audio defaults to the current desktop output monitor (`PW_TARGET=@DEFAULT_MONITOR@`), so meeting audio played by the computer is captured. Set `PW_TARGET=@DEFAULT_SOURCE@` to use the microphone, or specify another audio source. Lower `SILENCE_THRESHOLD` if quiet speech is not detected.
+4. Update `resume.txt` and `job_description.txt` with your details.
 
 ---
 
@@ -105,4 +107,3 @@ curl http://127.0.0.1:8765/health
 echo "Explain Bean Lifecycle in Spring Boot" | wl-copy
 bash ~/Downloads/interview-copilot/send_clipboard.sh
 ```
-
